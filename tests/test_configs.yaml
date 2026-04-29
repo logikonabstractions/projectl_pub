@@ -1,0 +1,25 @@
+# Sample YAML file
+game_parameters:
+  max_turns: 10
+
+# we list here the definitions of all the pieces available in game, including their level etc.
+pieces:
+  - name: square_1
+    level: 1
+    quantity: 3
+    shape: [[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: line_2
+    level: 2
+    quantity: 3
+    shape: [ [ 1, 0, 0, 0, 0 ], [ 1, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ] ]
+
+cards:
+  - reward:
+      points: 1
+      piece: null
+    mask: [[false,false,true,true,false,], [false,false,true,true,false], [false,false,true,true,false], [false,false,false,false,false], [false,false,false,false,false], ]
+players:
+  - name: Franciiiis
+    age: 39
+  - name: Kiiiim
+    age: 38

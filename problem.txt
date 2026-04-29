@@ -1,0 +1,13 @@
+We'd like to run the game, with one player using a random strategy and another using a basic strategy. Let's run the game for 10 turns. Adapt the config file so that we can initialize and run the game with this setup.
+
+Actually, I'd like to keep my current config file as-is and use another one for this run. So instead load a new `strategy_configs.yaml` file based on a command-line argument to run the game with that configuration. Give me the command to load it (instead of the default). You might have to debug the game initialisation and the config loading in order to actually have players assigned the proper strategy. We care about the acceptance criteria below ultimately. Make the required adaptations.
+
+I'm aware that the game as it is isn't complete - it doesn't compute scores, the termination is based on number of turns and not the actual game rules, not all cards and pieces are defined from the actual game. That's fine -- do not implement new functionalities (this would be a separate task). If placeholders actions are used that's fine, don't implement them, just use the placeholders. At this point, what we want is that the game runs with selected strategies assign to players.
+
+Acceptance:
+
+1 - Game initialized with 2 players, playing 10 turns, one with a random strat and the other with a basic strat.
+2 - The game runs without crashing to the end (10 turns)
+3 - the random strategy chooses at random within the pool of actions
+4 - the basic strategy acts according to the state priority order (place if possibe, take card otherwise take piece)
+5 - Game logic is sound and actions have the intended consequence. For instance, taking a piece adds a piece to the player's bank, taking a card adds a card, placing a piece on a card adds a piece to that card and removes the piece from the player's pieces.
