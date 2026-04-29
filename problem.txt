@@ -1,0 +1,13 @@
+We'd like to run the game, with one player using a random strategy and another using a basic strategy. Let's say we run the game for 10 turns. Adapt the config file to when we run the game, this is what is setup.
+
+Actually, I'd like to keep my current config file as-is and use another one for this run. So make a different one and provide me with the command-line/instructions to run the game with that configuration.
+
+Obviously, the game shouldn't crash. But also there shouldn't be obvious logical mistake in the game run. I think everything is in place as the basics of the game mechanics is there. There may be small bug fixes so this works: you can do small changes to the strategies, the player's classes or game manager. However DO NOT overhaul the whole game mechanics, it runs fine.
+
+I'm aware that the game as it is isn't complete - it doesn't compute scores, have a clear termination (beyond the number of turns set in the config) and some functionalities are not implemented yet. Those shouldn't block you. If you run into an error, don't add new functionalities to the code (this would be a separate task). You could however adapt either the basic strategy or the random strategy so that they run within the limitations of what is currently implemented. 
+
+Ultimately what we want is this:
+
+1 - Game initialized with 2 players, playing 10 turns, one with a random strat and the other with a basic start.
+2 - Within the confines of functionalities currently implemented, the games runs without issues.
+3 - within the configs of functionalities currently implemented, the results are logical and as expect (e.g. no player ends up with 15 cards, etc.).
