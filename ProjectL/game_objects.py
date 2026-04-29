@@ -1,7 +1,11 @@
 import string
 import random
-from ProjectL.classes import TakePiece, PlacePiece, UpgradePiece, TakeCard, Master, Card, Piece, PieceSquare
 import logging
+
+from ProjectL.pieces import Piece, PieceSquare
+from ProjectL.card import Card
+from ProjectL.actions import TakePiece, PlacePiece, TakeCard
+from ProjectL.strategies import Strategy, RandomStrat, TakePieceStrat, BasicStrat
 
 
 class GameState:
@@ -39,8 +43,6 @@ class GameManager:
         self.logger = logger or logging.getLogger('projectL')
         self.game_state = GameState(current_turn_number=1, max_turns=configs_dict["game_parameters"]["max_turns"], logger=self.logger)
 
-        # Set up logger
-
         self.pieces = []
         self.piece_bank = {}
         self.actions = [TakePiece, PlacePiece, TakeCard]
@@ -64,22 +66,17 @@ class GameManager:
         """
         """
         self.logger.debug("Creating game pieces", extra={"normal": False})
-        # self.pieces = []
-        # Create the piece bank
         for piece_confs in self.configs_pieces:
             piece_name = piece_confs["name"]
             level = piece_confs["level"]
             quantity = piece_confs.get("quantity", 10)
 
-            # Create a prototype piece
             prototype_piece = Piece(configs=piece_confs)
             self.logger.debug(f"Created piece prototype: {prototype_piece}",
                               extra={"normal": False, "verbose": True})
 
-            # Add multiple instances to the bank
             self.piece_bank[piece_name] = []
             for _ in range(quantity):
-                # Create a new instance with the same configuration
                 p = Piece(configs=piece_confs)
                 self.piece_bank[piece_name].append(p)
 
@@ -99,7 +96,6 @@ class GameManager:
         Returns:
             A piece from the bank, or None if the requested piece is not available
         """
-        # If no specific piece requested, choose a random piece type that's available
         if piece_name is None:
             available_types = [name for name, pieces in self.piece_bank.items() if pieces]
             if not available_types:
@@ -109,13 +105,11 @@ class GameManager:
 
             piece_name = random.choice(available_types)
 
-        # Check if the requested piece type is available
         if piece_name not in self.piece_bank or not self.piece_bank[piece_name]:
             self.logger.debug(f"No {piece_name} pieces available in the bank",
                               extra={"normal": False})
             return None
 
-        # Take a piece from the bank
         piece = self.piece_bank[piece_name].pop()
         self.logger.debug(f"Taking {piece_name} from bank. Remaining: {len(self.piece_bank[piece_name])}",
                           extra={"normal": False})
@@ -135,7 +129,6 @@ class GameManager:
             self.logger.debug(f"{self.player_2.name}'s turn", extra={"normal": False})
             self.player_2.play_turn()
 
-            # update turn number, but for debug check the state of the game
             if self.current_turn_number % 10 == 0:
                 self.logger.info(f"Player state: {self.player_1}", extra={"normal": True})
                 self.logger.info(f"Player state: {self.player_2}", extra={"normal": True})
@@ -162,19 +155,15 @@ class Player:
     """ a class that describes a player """
 
     def __init__(self, name=None, cards=None, pieces=None, actions=None, strategy=None, logger=None, game_manager=None, **kwargs):
-        # Set up logger
         self.logger = logger or logging.getLogger('projectL')
 
-        # attri. that defines the Player itself
         self.name = name if name is not None else self.generate_random_name()
         self.actions_left = 3
         self.game_manager = game_manager
 
-        # list of objects, game stuff
         self.cards = cards if cards else []
         self.full_cards = []
         self.pieces = pieces if pieces else self.get_initial_pieces()
-        # self.actions = actions if actions else self.get_actions()
         self.kwargs = kwargs
 
         self.strategy = strategy if strategy else RandomStrat(player=self, logger=self.logger)
@@ -194,7 +183,6 @@ class Player:
     def generate_random_name(self, length=5):
         """ just for fun - generates random names to players if none assigned """
         chars = string.ascii_lowercase
-        # Generate a random name of specified length
         name = ''.join(random.choice(chars) for _ in range(length))
         self.logger.debug(f"Generated random name: {self.name}", extra={"normal": False, "verbose": True})
         return name
@@ -202,7 +190,6 @@ class Player:
     def get_initial_pieces(self):
         self.logger.debug(f"Getting initial pieces for {self.name}", extra={"normal": False, "verbose": True})
         if self.game_manager:
-            # Get a level 1 piece from the bank
             piece = self.game_manager.get_piece("square_1")
             return [piece] if piece else []
         return [PieceSquare()]  # Fallback
@@ -213,242 +200,3 @@ class Player:
         self.strategy.player = self
         if hasattr(strategy, 'logger'):
             strategy.logger = self.logger
-
-class Strategy:
-    """Base strategy class for implementing different playing strategies.
-
-    Allows for fixed sequences of actions or dynamic decision-making.
-    Used by the Player class.
-    """
-    def __init__(self, player, actions_sequence=None, action_list=None, logger=None):
-        self.player = player
-        self.action_sequence = actions_sequence if actions_sequence else ()
-        self.actions = action_list if action_list else (TakePiece, PlacePiece, UpgradePiece, TakeCard, Master)
-        self.actions_left = 3
-        self.logger = logger or logging.getLogger('projectL')
-
-    def play_turn(self):
-        raise NotImplemented
-
-    @property
-    def pieces(self):
-        return self.player.pieces
-    @property
-    def cards(self):
-        return self.player.cards
-    @cards.setter
-    def cards(self, value):
-        self.player.cards = value
-    @property
-    def full_cards(self):
-        return self.player.full_cards
-    @full_cards.setter
-    def full_cards(self, value):
-        self.player.full_cards = value
-    @property
-    def name(self):
-        return self.player.name
-
-
-class RandomStrat(Strategy):
-    """Strategy that chooses actions randomly."""
-
-    def __init__(self, player, logger=None, **kwargs):
-        super().__init__(player, logger=logger, **kwargs)
-
-    def choose_action(self):
-        """Randomly selects an action from available action types."""
-        action_class = random.choice(self.actions)
-        action_selected = action_class(pieces=self.pieces, cards=self.cards, game_manager=self.player.game_manager)
-        self.logger.debug(f"{self.name} randomly selected action: {action_selected}",
-                          extra={"normal": False, "verbose": True})
-        return action_selected
-
-    def play_turn(self):
-        """Play a turn by randomly choosing valid actions until actions run out."""
-        self.actions_left = 3
-        self.logger.debug(f"{self.name} starting turn with {self.actions_left} actions ",
-                          extra={"normal": False})
-
-        while self.actions_left > 0:
-            action = self.choose_action()
-
-            # Keep trying actions until we find a valid one
-            attempts = 0
-            while not action.is_action_valid() and attempts < 10:
-                self.logger.debug(f"{self.name} action invalid, trying another",
-                                  extra={"normal": False, "verbose": True})
-                action = self.choose_action()
-                attempts += 1
-
-            if attempts >= 10:
-                self.logger.debug(f"{self.name}  couldn't find valid action after 10 attempts",
-                                  extra={"normal": False})
-                break
-
-            # Execute the valid action and consume an action
-            self.logger.info(f"{self.name}  performs: {action}",  extra={"normal": True})
-            action.perform_action()
-            self.actions_left -= 1
-        self.logger.debug(f"Player state: {self.player}", extra={"normal": False, "verbose": True})
-
-class TakePieceStrat(Strategy):
-    """Always takes a piece"""
-
-    def __init__(self, player, logger=None, **kwargs):
-        super().__init__(player, logger=logger, **kwargs)
-
-    def choose_action(self):
-        """Randomly selects an action from available action types."""
-        # action_class = random.choice(self.actions)
-        action_selected = TakePiece(pieces=self.pieces, cards=self.cards, game_manager=self.player.game_manager)
-        self.logger.debug(f"{self.name} randomly selected action: {action_selected}",
-                          extra={"normal": False, "verbose": True})
-        return action_selected
-
-    def play_turn(self):
-        """Play a turn by randomly choosing valid actions until actions run out."""
-        self.actions_left = 3
-        self.logger.debug(f"{self.name} starting turn with {self.actions_left} actions ",
-                          extra={"normal": False})
-
-        while self.actions_left > 0:
-            action = self.choose_action()
-
-            # Keep trying actions until we find a valid one
-            attempts = 0
-            while not action.is_action_valid() and attempts < 10:
-                self.logger.debug(f"{self.name} action invalid, trying another",
-                                  extra={"normal": False, "verbose": True})
-                action = self.choose_action()
-                attempts += 1
-
-            if attempts >= 10:
-                self.logger.debug(f"{self.name}  couldn't find valid action after 10 attempts",
-                                  extra={"normal": False})
-                break
-
-            # Execute the valid action and consume an action
-            self.logger.info(f"{self.name}  performs: {action}",  extra={"normal": True})
-            action.perform_action()
-            self.actions_left -= 1
-        self.logger.debug(f"Player state: {self.player}", extra={"normal": False, "verbose": True})
-
-class BasicStrat(Strategy):
-    """Basic strategy with a simple priority system:
-
-    Priority order:
-    1. Place a piece if you have both cards and pieces
-    2. Take a piece if you have no pieces
-    3. Take a card if you have no cards (and pieces available)
-    """
-
-    def __init__(self, player, logger=None, **kwargs):
-        super().__init__(player, logger=logger, **kwargs)
-
-    def _move_full_cards(self):
-        """Move completed cards from active cards to full cards collection."""
-        full_cards = [card for card in self.cards if card.is_full]
-        if full_cards:
-            self.logger.info(f"{self.name}  completed {len(self.player.full_cards)} cards", extra={"normal": True})
-            self.full_cards.extend(full_cards)
-            self.cards = [card for card in self.cards if not card.is_full]
-
-    def _execute_action(self, action):
-        """Execute an action if valid and consume an action point.
-
-        Returns:
-            bool: True if action was executed successfully
-        """
-        if action.is_action_valid():
-            self.logger.info(f"{self.name}  performs: {action}", extra={"normal": True})
-            action.perform_action()
-            self.actions_left -= 1
-            return True
-        else:
-            self.logger.debug(f"{self.name}  action invalid: {action}", self.name, action.desc, extra={"normal": False, "verbose": True})
-            return False
-
-    def _try_place_piece(self):
-        """Attempt to place a piece on a card.
-
-        Returns:
-            bool: True if placement was successful
-        """
-        if not (self.cards and self.pieces):
-            self.logger.debug(f"{self.name}  can't place piece - missing cards or pieces",
-
-                             extra={"normal": False, "verbose": True})
-            return False
-
-        # Try to place a piece on the first available card
-        piece = self.pieces.pop()
-        action = PlacePiece(piece, self.cards[0], pieces=self.pieces)
-        self.logger.debug(f"{self.name} attempting to place piece on card",  extra={"normal": False})
-
-        if self._execute_action(action):
-            return True
-        else:
-            self.pieces.append(piece)  # put it back in the pack since the action failed
-            self.logger.debug(f"{self.name} failed to place piece, returning to inventory",
-
-                             extra={"normal": False, "verbose": True})
-            return False
-
-    def _determine_best_action(self):
-        """Determine the best action based on current game state.
-
-        Returns:
-            Action or None: The best action to take, or None if no valid action
-        """
-        # Priority 1: Place a piece if we have both cards and pieces
-        if self.cards and self.pieces:
-            self.logger.debug(f"{self.name}  strategy: place piece (has cards and pieces)",
-                             extra={"normal": False})
-            return PlacePiece(self.pieces[-1], self.cards[0], pieces=self.pieces, game_manager=self.player.game_manager)
-
-        # Priority 2: Take a piece if we have no pieces
-        if not self.pieces:
-            self.logger.debug(f"{self.name} strategy: take piece (no pieces)",
-                             extra={"normal": False})
-            return TakePiece(pieces=self.pieces, game_manager=self.player.game_manager)
-
-        # Priority 3: Take a card if we have no cards
-        if not self.cards:
-            self.logger.debug(f"{self.name} strategy: take card (no cards)",
-                             extra={"normal": False})
-            return TakeCard(cards=self.cards)
-
-        # Default: Take a piece (better than nothing)
-        self.logger.debug(f"{self.name}  strategy: default to take piece",
-                         extra={"normal": False})
-        return TakePiece(pieces=self.pieces, game_manager=self.player.game_manager)
-
-    def play_turn(self):
-        """Execute the turn following the basic strategy priority system."""
-        self.actions_left = 3
-        self.logger.debug(f"{self.player} plays turn (BasicStrat)",
-                         extra={"normal": False})
-
-        # First, handle any completed cards
-        self._move_full_cards()
-
-        actions_attempted = 0
-        max_attempts = 10  # Prevent infinite loops
-
-        while self.actions_left > 0 and actions_attempted < max_attempts:
-            actions_attempted += 1
-
-            # Get the best action based on current state
-            action = self._determine_best_action()
-
-            if action and self._execute_action(action):
-                continue
-            else:
-                # No valid actions available, pass remaining actions
-                self.logger.info(f"{self.player.name} passes remaining %d actions",
-                               self.name, self.actions_left,
-                               extra={"normal": True})
-                self.actions_left = 0
-
-        self.logger.debug(f"Player state: {self.player}", extra={"normal": False, "verbose": True})

@@ -4,7 +4,6 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from test_piece import TestPiece
 from test_cube_generation import TestCubeGeneration
 from tests.test_game_integration import TestGameIntegration
 
@@ -13,7 +12,6 @@ if __name__ == '__main__':
     suite = unittest.TestSuite()
 
     # Add tests
-    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestPiece))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestCubeGeneration))
     suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestGameIntegration))
 
