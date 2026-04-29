@@ -9,5 +9,5 @@ Acceptance:
 1 - Game initialized with 2 players, playing 10 turns, one with a random strat and the other with a basic strat.
 2 - The game runs without crashing to the end (10 turns)
 3 - the random strategy chooses at random within the pool of actions
-4 - the basic strategy acts according to the state priority order (place if possibe, take card otherwise take piece)
-5 - Game logic is sound and actions have the intended consequence. For instance, taking a piece adds a piece to the player's bank, taking a card adds a card, placing a piece on a card adds a piece to that card and removes the piece from the player's pieces.
+4 - the basic strategy acts according to this priority order: 1 - place if possibe, 2- take card if placing a piece fails 3 - take piece
+5 - Game logic is sound and actions have the intended consequence. For now, it'll be enough that taking a piece adds a piece to the player's bank, taking a card adds a card, placing a piece on a card adds a piece to that card and removes the piece from the player's pieces.
