@@ -1,22 +1,22 @@
-FROM python:3.13.2-alpine3.21
+FROM debian:bookworm-slim
 
-# prevent alpine error with TkAgg but still allow GUI for my local dev...
-ENV HEADLESS=true
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HEADLESS=true
 
-# some meson build error, seems to be absent c compiler on alpine?
-RUN apk add --no-cache \
-        build-base \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 \
+        python3-pip \
         python3-dev \
-        musl-dev \
-        openblas-dev \
-        lapack-dev
+        gcc \
+        libopenblas-dev \
+        liblapack-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# slimming the image
-RUN apk del build-base python3-dev musl-dev
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt \
+    && apt-get purge -y --auto-remove gcc python3-dev
 
 COPY . .
 CMD ["sh"]
