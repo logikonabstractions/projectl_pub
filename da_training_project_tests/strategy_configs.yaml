@@ -1,0 +1,35 @@
+game_parameters:
+  max_turns: 10
+
+pieces:
+  - name: square_1
+    level: 1
+    quantity: 15
+    shape: [[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: line_2
+    level: 2
+    quantity: 10
+    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: corner_3
+    level: 3
+    quantity: 10
+    shape: [[1, 0, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+
+cards:
+  - reward:
+      points: 1
+      piece: null
+    mask: [[false,false,true,true,false], [false,false,true,true,false], [false,false,true,true,false], [false,false,false,false,false], [false,false,false,false,false]]
+
+players:
+  - name: PlayerRandom
+    strategy: random
+  - name: PlayerBasic
+    strategy: basic
+
+logging:
+  mode: normal
+  log_dir: logs
+  max_file_size_mb: 5
+  backup_count: 3
+  logger_name: 'test_logger'

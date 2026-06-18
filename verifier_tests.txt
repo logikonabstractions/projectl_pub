@@ -1,0 +1,16 @@
+
+Verifier alignment: If the verifiers are misaligned with the problem, the model may be improperly rewarded or penalized. This is an area where we commonly see issues in submissions in real projects. For example:
+
+Verifiers can be overspecified, meaning they impose requirements on solutions that are not actually stated or implied by the problem statement.
+
+This can mean that the verifiers are overly tailored to a particular set of possible solutions, and we end up improperly penalizing good solutions.
+
+In an extreme case, if there is a verifier that contradicts the problem statement, we end up penalizing all good solutions and rewarding some bad solutions.
+
+Simple example: suppose the verifiers include tests that expect the model to write a new function named foo, but the prompt does not specify that the function should be named foo. A correct solution that names the function bar would improperly fail the tests.
+
+Verifiers can be underspecified, meaning they are missing requirements from the problem statement.
+
+This can mean that the verifiers are overly permissive and could allow flawed solutions to pass.
+
+Simple example: suppose the problem explicitly specifies that a particular function that the agent will write should be named foo. If the verifiers do not check that the function is named foo, then a solution that names the function bar could pass all the verifiers, even though it has not followed all the instructions from the problem statement.

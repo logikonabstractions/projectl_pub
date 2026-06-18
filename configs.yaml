@@ -1,0 +1,57 @@
+# Sample YAML file
+game_parameters:
+  max_turns: 50
+logging:
+  mode: full_debug  # Options: normal, detailed, full_debug
+  log_dir: logs
+  max_file_size_mb: 5
+  backup_count: 3
+  logger_name: 'bob'
+# we list here the definitions of all the pieces available in game, including their level etc.
+pieces:
+  - name: square_1
+    level: 1
+    quantity: 10
+    shape: [[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: line_2
+    level: 2
+    quantity: 10
+    shape: [ [ 1, 0, 0, 0, 0 ], [ 1, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ] ]
+  - name: corner_3
+    level: 3
+    quantity: 10
+    shape: [[1, 0, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: line_3
+    level: 3
+    quantity: 10
+    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: big_square_4
+    level: 4
+    quantity: 10
+    shape: [[1, 1, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: line_4
+    level: 4
+    quantity: 10
+    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+  - name: l_shape_4
+    level: 4
+    quantity: 10
+    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+
+  
+cards:
+  - reward:
+      points: 1
+      piece: null
+    mask: [[false,false,true,true,false,], [false,false,true,true,false], [false,false,true,true,false], [false,false,false,false,false], [false,false,false,false,false], ]
+players:
+  - name: Franciiiis
+    age: 39
+  - name: Kiiiim
+    age: 38
+
+config:
+  enabled: true
+  features:
+    feature1: active
+    feature2: inactive
