@@ -1,0 +1,194 @@
+cards:
+- id: C_1_1
+  name: small_l
+  rewards:
+    points: 1
+    piece: P1
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_1_2
+  name: bar_3_up
+  rewards:
+    points: 1
+    piece: P2
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_1_3
+  name: corner_card
+  rewards:
+    points: 1
+    piece: P2
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 1, 0]
+    - [0, 0, 1, 1, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_1_4
+  name: shallow_T_under
+  rewards:
+    points: 1
+    piece: P2
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_1_5
+  name: rotated_w
+  rewards:
+    points: 1
+    piece: P3
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 1, 0, 0]
+    - [0, 0, 1, 1, 0]
+    - [0, 0, 0, 1, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_1_6
+  name: shallow_u_shape
+  rewards:
+    points: 1
+    piece: P3
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 0, 1, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_1_7
+  name: long_line
+  rewards:
+    points: 1
+    piece: P4
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+    - [1, 1, 1, 1, 1]
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_1_8
+  name: small_block
+  rewards:
+    points: 1
+    piece: P4
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 1, 0, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 0, 0, 0]
+
+
+- id: C_2_1
+  name: T
+  rewards:
+    points: 2
+    piece: P2
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 1, 0, 0]
+
+- id: C_2_2
+  name: stairway
+  rewards:
+    points: 2
+    piece: P3
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 0, 0, 0]
+    - [0, 1, 1, 0, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 1, 0, 0, 0]
+
+- id: C_2_3
+  name: 
+  rewards:
+    points: 2
+    piece: P4
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 1, 0, 0]
+    - [0, 1, 1, 0, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 0, 0, 0]
+
+- id: C_2_4
+  name: z_shape
+  rewards:
+    points: 2
+    piece: P10
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 0, 1, 1, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 1, 1, 0]
+
+- id: C_2_5
+  name: block_1
+  rewards:
+    points: 2
+    piece: P8
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 1, 0, 0, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 1, 1, 0]
+
+- id: C_2_6
+  name: body
+  rewards:
+    points: 2
+    piece: P5
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 1, 0, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 1, 1, 1, 0]
+    - [0, 0, 1, 0, 0]
+
+- id: C_2_7
+  name: 
+  rewards:
+    points: 2
+    piece: P1
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [0, 0, 0, 0, 0]
+    - [1, 1, 1, 1, 0]
+    - [0, 1, 1, 1, 1]
+    - [0, 0, 0, 0, 0]
+
+
+- id: C_2_8
+  name: 
+  rewards:
+    points: 2
+    piece: P7
+  matrix:
+    - [0, 0, 0, 0, 0]
+    - [1, 1, 0, 0, 0]
+    - [1, 1, 1, 1, 0]
+    - [0, 0, 1, 1, 0]
+    - [0, 0, 0, 0, 0]

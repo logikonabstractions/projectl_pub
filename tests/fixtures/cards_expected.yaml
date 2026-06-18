@@ -1,0 +1,91 @@
+# Ground-truth values for every card in cards_list.yaml, keyed by card id.
+# Used by tests/test_cards.py. When you add a card to cards_list.yaml, add its
+# expected values here too (test_fixture_coverage enforces this).
+#
+#   mask_cell_count: number of playable (true) cells in the mask
+#   reward_points:   points awarded for completing the card
+#   reward_piece:    the piece the card should award, resolved to its piece name.
+#                    cards_list.yaml references pieces by id (P1..P10); the mapping is:
+#                    P1=monomino P2=domino P3=small_L P4=straight_3 P5=large_L
+#                    P6=square P7=T P8=long_bar P9=large_corner P10=zee
+#                    (test_reward_piece currently fails here until the loader resolves the reference)
+
+C_1_1:
+  mask_cell_count: 2
+  reward_points: 1
+  reward_piece: monomino
+
+C_1_2:
+  mask_cell_count: 3
+  reward_points: 1
+  reward_piece: domino
+
+C_1_3:
+  mask_cell_count: 3
+  reward_points: 1
+  reward_piece: domino
+
+C_1_4:
+  mask_cell_count: 4
+  reward_points: 1
+  reward_piece: domino
+
+C_1_5:
+  mask_cell_count: 5
+  reward_points: 1
+  reward_piece: small_L
+
+C_1_6:
+  mask_cell_count: 5
+  reward_points: 1
+  reward_piece: small_L
+
+C_1_7:
+  mask_cell_count: 5
+  reward_points: 1
+  reward_piece: straight_3
+
+C_1_8:
+  mask_cell_count: 5
+  reward_points: 1
+  reward_piece: straight_3
+
+C_2_1:
+  mask_cell_count: 6
+  reward_points: 2
+  reward_piece: domino
+
+C_2_2:
+  mask_cell_count: 7
+  reward_points: 2
+  reward_piece: small_L
+
+C_2_3:
+  mask_cell_count: 7
+  reward_points: 2
+  reward_piece: straight_3
+
+C_2_4:
+  mask_cell_count: 8
+  reward_points: 2
+  reward_piece: zee
+
+C_2_5:
+  mask_cell_count: 9
+  reward_points: 2
+  reward_piece: long_bar
+
+C_2_6:
+  mask_cell_count: 8
+  reward_points: 2
+  reward_piece: large_L
+
+C_2_7:
+  mask_cell_count: 8
+  reward_points: 2
+  reward_piece: monomino
+
+C_2_8:
+  mask_cell_count: 8
+  reward_points: 2
+  reward_piece: T
