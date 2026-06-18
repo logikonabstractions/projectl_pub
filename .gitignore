@@ -137,3 +137,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Generated game-data assets — produced from the *_list.md source files, not committed
+cards_list.yaml
+pieces_list.yaml
