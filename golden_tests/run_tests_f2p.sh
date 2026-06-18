@@ -9,8 +9,8 @@ if [ -f ".venv/bin/activate" ]; then
   source .venv/bin/activate
 fi
 
-echo "=== F2P: golden_test/test_pieces.py ==="
-python -m pytest golden_test/test_pieces.py -v
+echo "=== F2P: golden_tests/test_pieces.py ==="
+python -m pytest golden_tests/test_pieces.py -v
 
-echo "=== F2P: golden_test/test_cards.py ==="
-python -m pytest golden_test/test_cards.py -v
+echo "=== F2P: golden_tests/test_cards.py ==="
+python -m pytest golden_tests/test_cards.py -v
