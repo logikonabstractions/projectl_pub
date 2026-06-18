@@ -1,0 +1,590 @@
+diff --git a/ProjectL/card.py b/ProjectL/card.py
+index 8630ec8..a7560f1 100644
+--- a/ProjectL/card.py
++++ b/ProjectL/card.py
+@@ -1,4 +1,5 @@
+ import numpy as np
++import yaml
+ 
+ from ProjectL.pieces import PieceSquare
+ 
+@@ -7,12 +8,13 @@ class Reward:
+     """
+         Describes what we get for finishing a card. Points and/or a piece
+     """
+-    def __init__(self, points = 0, piece = None):
++    def __init__(self, points=0, piece=None):
+         self.points = points
+         self.piece = piece if piece else PieceSquare()
+ 
+     def __repr__(self):
+-        return f"Points: {self.points} with piece: {self.piece.name}"
++        piece_name = getattr(self.piece, "name", self.piece)
++        return f"Points: {self.points} with piece: {piece_name}"
+ 
+ class Card:
+     """ Describes the different cards we can play with.
+@@ -21,11 +23,22 @@ class Card:
+         reward: the object that describes what piece / points we get for completing the card
+         mask: a bool numpy array that describes the playable structure of that card within the maximal matrix
+     """
+-    def __init__(self, configs = None):
++    def __init__(self, configs=None):
+         if configs:
+             self.layout = np.zeros(shape=(5, 5), dtype=int)
+-            self.mask = np.array(configs["mask"])
+-            self.reward = Reward(points=configs["reward"]["points"], piece=configs["reward"]["piece"])
++            # Support both "mask" (legacy bool array) and "matrix" (new int array)
++            if "mask" in configs:
++                self.mask = np.array(configs["mask"], dtype=bool)
++            elif "matrix" in configs:
++                self.mask = np.array(configs["matrix"], dtype=bool)
++            else:
++                self.mask = np.zeros((5, 5), dtype=bool)
++
++            reward_conf = configs.get("rewards", configs.get("reward", {}))
++            points = reward_conf.get("points", 0) if reward_conf else 0
++            piece = reward_conf.get("piece") if reward_conf else None
++
++            self.reward = Reward(points=points, piece=piece)
+         else:
+             self.layout = np.zeros(shape=(5, 5), dtype=int)
+             self.mask = np.array([[False,False,True,True,False,], [False,False,True,True,False], [False,False,True,True,False], [False,False,False,False,False], [False,False,False,False,False], ])
+@@ -63,3 +76,50 @@ class Card:
+ 
+     def __repr__(self):
+         return f"Mask: {self.mask}, full: {self.is_full}, reward: {self.reward}"
++
++
++def load_cards_from_yaml(filepath, piece_lookup=None):
++    """Load card definitions from a cards_list.yaml file.
++
++    Supports the canonical cards_list.yaml schema:
++      {id, name, rewards: {points, piece (ID string)}, matrix (5x5 ints)}
++
++    The piece ID in rewards (e.g. "P1") is resolved to a real Piece object
++    using the provided piece_lookup dict. If not resolvable, falls back to
++    the default PieceSquare.
++
++    Args:
++        filepath: Path to the YAML file containing card definitions.
++        piece_lookup: dict mapping piece_id -> Piece prototype (e.g. {"P1": Piece(...)}).
++                      If None, reward pieces default to PieceSquare.
++
++    Returns:
++        list of Card objects.
++    """
++    with open(filepath, 'r') as f:
++        data = yaml.safe_load(f)
++
++    cards = []
++    for c_raw in data["cards"]:
++        # Resolve piece reference
++        piece_id = None
++        reward_conf = c_raw.get("rewards", c_raw.get("reward", {}))
++        if reward_conf:
++            piece_id = reward_conf.get("piece")
++
++        piece = None
++        if piece_id and piece_lookup:
++            piece = piece_lookup.get(piece_id)
++
++        # Build the Card using the production Card constructor
++        card_config = {
++            "mask": [[bool(v) for v in row] for row in c_raw["matrix"]],
++            "reward": {
++                "points": reward_conf.get("points", 0) if reward_conf else 0,
++                "piece": piece,
++            }
++        }
++        card = Card(configs=card_config)
++        cards.append(card)
++
++    return cards
+diff --git a/ProjectL/game_objects.py b/ProjectL/game_objects.py
+index 3c8dcaf..2d26523 100644
+--- a/ProjectL/game_objects.py
++++ b/ProjectL/game_objects.py
+@@ -1,9 +1,10 @@
+ import string
+ import random
+ import logging
++import os
+ 
+-from ProjectL.pieces import Piece, PieceSquare
+-from ProjectL.card import Card
++from ProjectL.pieces import Piece, PieceSquare, load_pieces_from_yaml
++from ProjectL.card import Card, load_cards_from_yaml
+ from ProjectL.actions import TakePiece, PlacePiece, TakeCard
+ from ProjectL.strategies import Strategy, RandomStrat, TakePieceStrat, BasicStrat
+ 
+@@ -36,15 +37,18 @@ class GameState:
+ class GameManager:
+     """ the main game engine that runs the game. """
+ 
+-    def __init__(self, configs_dict, logger=None):
++    def __init__(self, configs_dict, logger=None, base_dir=None):
+         self.configs = configs_dict
+-        self.configs_pieces = configs_dict["pieces"]
+-        self.configs_cards = configs_dict["cards"]
+         self.logger = logger or logging.getLogger('projectL')
+         self.game_state = GameState(current_turn_number=1, max_turns=configs_dict["game_parameters"]["max_turns"], logger=self.logger)
+ 
++        # Base directory for resolving relative file paths in the config.
++        # Defaults to the current working directory if not provided.
++        self.base_dir = base_dir if base_dir is not None else os.getcwd()
++
+         self.pieces = []
+         self.piece_bank = {}
++        self.piece_lookup = {}   # piece_id -> Piece prototype (for reward resolution)
+         self.actions = [TakePiece, PlacePiece, TakeCard]
+         self.cards = []
+ 
+@@ -62,39 +66,68 @@ class GameManager:
+         self.logger.debug("Initializing game", extra={"normal": False})
+         self.instantiate_elements()
+ 
+-    def instantiate_elements(self):
+-        """
+-        """
+-        self.logger.debug("Creating game pieces", extra={"normal": False})
+-        for piece_confs in self.configs_pieces:
+-            piece_name = piece_confs["name"]
+-            level = piece_confs["level"]
+-            quantity = piece_confs.get("quantity", 10)
+-
+-            prototype_piece = Piece(configs=piece_confs)
+-            self.logger.debug(f"Created piece prototype: {prototype_piece}",
+-                              extra={"normal": False, "verbose": True})
+-
+-            self.piece_bank[piece_name] = []
+-            for _ in range(quantity):
+-                p = Piece(configs=piece_confs)
+-                self.piece_bank[piece_name].append(p)
++    def _resolve_path(self, filename):
++        """Resolve a filename relative to the base_dir."""
++        if os.path.isabs(filename):
++            return filename
++        return os.path.join(self.base_dir, filename)
+ 
++    def instantiate_elements(self):
++        """Load pieces and cards from their dedicated configuration files.
+ 
+-        for card_confs in self.configs_cards:
+-            card = Card(configs=card_confs)
+-            self.cards.append(card)
+-            self.logger.debug(f"Created card: {card}",
+-                              extra={"normal": False, "verbose": True})
++        If the config specifies 'pieces_file' and/or 'cards_file', those YAML files
++        are loaded from the base_dir. Otherwise falls back to inline 'pieces' / 'cards'
++        sections in the config dict for backward compatibility.
++        """
++        # --- Pieces ---
++        if "pieces_file" in self.configs:
++            pieces_path = self._resolve_path(self.configs["pieces_file"])
++            self.logger.debug(f"Loading pieces from {pieces_path}", extra={"normal": False})
++            self.piece_lookup, self.piece_bank = load_pieces_from_yaml(pieces_path)
++            self.logger.debug(f"Loaded {len(self.piece_bank)} piece types", extra={"normal": False})
++        elif "pieces" in self.configs:
++            # Legacy inline format
++            self.logger.debug("Loading pieces from inline config", extra={"normal": False})
++            for piece_confs in self.configs["pieces"]:
++                piece_name = piece_confs["name"]
++                quantity = piece_confs.get("quantity", 10)
++
++                prototype_piece = Piece(configs=piece_confs)
++                self.logger.debug(f"Created piece prototype: {prototype_piece}",
++                                  extra={"normal": False, "verbose": True})
++
++                piece_id = piece_confs.get("id", piece_name)
++                self.piece_lookup[piece_id] = prototype_piece
++                self.piece_bank[piece_name] = []
++                for _ in range(quantity):
++                    p = Piece(configs=piece_confs)
++                    self.piece_bank[piece_name].append(p)
++
++        # --- Cards ---
++        if "cards_file" in self.configs:
++            cards_path = self._resolve_path(self.configs["cards_file"])
++            self.logger.debug(f"Loading cards from {cards_path}", extra={"normal": False})
++            self.cards = load_cards_from_yaml(cards_path, piece_lookup=self.piece_lookup)
++            self.logger.debug(f"Loaded {len(self.cards)} cards", extra={"normal": False})
++        elif "cards" in self.configs:
++            # Legacy inline format
++            self.logger.debug("Loading cards from inline config", extra={"normal": False})
++            for card_confs in self.configs["cards"]:
++                card = Card(configs=card_confs)
++                self.cards.append(card)
++                self.logger.debug(f"Created card: {card}",
++                                  extra={"normal": False, "verbose": True})
+ 
+     def get_piece(self, piece_name=None):
+-        """Get a piece from the bank
++        """Get a piece from the bank.
++
++        Looks up by piece name (bank key). If None, returns a random available piece.
+ 
+         Args:
+             piece_name: Optional name of the piece to get. If None, returns a random piece.
+ 
+         Returns:
+-            A piece from the bank, or None if the requested piece is not available
++            A piece from the bank, or None if the requested piece is not available.
+         """
+         if piece_name is None:
+             available_types = [name for name, pieces in self.piece_bank.items() if pieces]
+@@ -188,9 +221,13 @@ class Player:
+         return name
+ 
+     def get_initial_pieces(self):
++        """Give the player their starting piece (the monomino / 1×1 square)."""
+         self.logger.debug(f"Getting initial pieces for {self.name}", extra={"normal": False, "verbose": True})
+         if self.game_manager:
+-            piece = self.game_manager.get_piece("square_1")
++            # Try the canonical name first, then the legacy name as fallback
++            piece = self.game_manager.get_piece("monomino")
++            if piece is None:
++                piece = self.game_manager.get_piece("square_1")
+             return [piece] if piece else []
+         return [PieceSquare()]  # Fallback
+ 
+diff --git a/ProjectL/pieces.py b/ProjectL/pieces.py
+index f9b994f..1e630ec 100644
+--- a/ProjectL/pieces.py
++++ b/ProjectL/pieces.py
+@@ -1,6 +1,7 @@
+ import random
+ 
+ import numpy as np
++import yaml
+ 
+ from ProjectL.utils.utils import plot_image
+ 
+@@ -8,16 +9,21 @@ from ProjectL.utils.utils import plot_image
+ class Piece:
+     """describes a Piece that a Player can place on a Card"""
+ 
+-    def __init__(self, configs = None):
++    def __init__(self, configs=None):
++        self.id = None
+         self.level = None
+         self.shape = None
+         self.name = None
+         self.configurations_array = []
+         self.cube = None
+         if configs:
+-            self.level = configs["level"]
+-            self.shape = np.array(configs["shape"])
++            self.id = configs.get("id", None)
+             self.name = configs["name"]
++            # Support both old format ("level") and new format ("cells")
++            self.level = configs.get("level", configs.get("cells", 1))
++            # Support both old format ("shape") and new format ("matrix")
++            shape_data = configs.get("shape", configs.get("matrix", None))
++            self.shape = np.array(shape_data, dtype=int) if shape_data is not None else None
+             self.configurations_array = []
+             self.cube = None
+             self.generate_cube()
+@@ -102,3 +108,70 @@ class PieceSquare(Piece):
+     def __init__(self):
+         configs = {"name": "square_1", "level": 1, "shape": [[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]}
+         super().__init__(configs)
++
++
++def _pad_to_5x5(matrix):
++    """Place an arbitrary (<=5x5) int matrix into the top-left of a 5x5 grid."""
++    grid = np.zeros((5, 5), dtype=int)
++    src = np.array(matrix, dtype=int)
++    grid[:src.shape[0], :src.shape[1]] = src
++    return grid.tolist()
++
++
++def load_pieces_from_yaml(filepath, default_quantity=10):
++    """Load piece definitions from a pieces_list.yaml file.
++
++    Supports the canonical pieces_list.yaml schema:
++      {id, name, cells, matrix (<=4x4 ints)}
++
++    Also supports the legacy configs.yaml schema:
++      {name, level, quantity, shape (5x5 ints)}
++
++    Args:
++        filepath: Path to the YAML file containing piece definitions.
++        default_quantity: Default number of pieces per type if not specified.
++
++    Returns:
++        tuple: (piece_lookup, piece_bank)
++            piece_lookup: dict mapping piece_id -> Piece prototype (e.g., {"P1": Piece(monomino)})
++            piece_bank:   dict mapping piece_name -> list of Piece instances (e.g., {"monomino": [...]})
++    """
++    with open(filepath, 'r') as f:
++        data = yaml.safe_load(f)
++
++    piece_lookup = {}   # id -> Piece prototype
++    piece_bank = {}     # name -> [Piece instances]
++
++    for p_raw in data["pieces"]:
++        # Normalise to the Piece constructor's expected schema
++        if "matrix" in p_raw:
++            # New canonical format
++            normalized = {
++                "id":    p_raw["id"],
++                "name":  p_raw["name"],
++                "level": p_raw.get("level", p_raw.get("cells", 1)),
++                "cells": p_raw.get("cells", 1),
++                "shape": _pad_to_5x5(p_raw["matrix"]),
++            }
++        else:
++            # Legacy format (shape already 5x5)
++            normalized = {
++                "id":    p_raw.get("id", p_raw["name"]),
++                "name":  p_raw["name"],
++                "level": p_raw.get("level", 1),
++                "cells": p_raw.get("cells", p_raw.get("level", 1)),
++                "shape": p_raw["shape"],
++            }
++
++        piece_id = normalized["id"]
++        piece_name = normalized["name"]
++        quantity = p_raw.get("quantity", default_quantity)
++
++        # One prototype for ID-based lookup (e.g., resolving card rewards)
++        prototype = Piece(configs=normalized)
++        piece_lookup[piece_id] = prototype
++
++        # Multiple copies for the bank
++        piece_bank[piece_name] = [Piece(configs=normalized) for _ in range(quantity)]
++
++    return piece_lookup, piece_bank
+diff --git a/configs.yaml b/configs.yaml
+index 160ee70..99b8d1b 100644
+--- a/configs.yaml
++++ b/configs.yaml
+@@ -1,4 +1,4 @@
+-# Sample YAML file
++# Main game configuration
+ game_parameters:
+   max_turns: 50
+ logging:
+@@ -7,43 +7,12 @@ logging:
+   max_file_size_mb: 5
+   backup_count: 3
+   logger_name: 'bob'
+-# we list here the definitions of all the pieces available in game, including their level etc.
+-pieces:
+-  - name: square_1
+-    level: 1
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: line_2
+-    level: 2
+-    quantity: 10
+-    shape: [ [ 1, 0, 0, 0, 0 ], [ 1, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ] ]
+-  - name: corner_3
+-    level: 3
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: line_3
+-    level: 3
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: big_square_4
+-    level: 4
+-    quantity: 10
+-    shape: [[1, 1, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: line_4
+-    level: 4
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: l_shape_4
+-    level: 4
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+ 
+-  
+-cards:
+-  - reward:
+-      points: 1
+-      piece: null
+-    mask: [[false,false,true,true,false,], [false,false,true,true,false], [false,false,true,true,false], [false,false,false,false,false], [false,false,false,false,false], ]
++# Dedicated configuration files for pieces and cards.
++# Paths are relative to this config file's directory (the project root).
++pieces_file: pieces_list.yaml
++cards_file: cards_list.yaml
++
+ players:
+   - name: Franciiiis
+     age: 39
+diff --git a/golden_tests/conftest_helpers.py b/golden_tests/conftest_helpers.py
+index b825026..858e61c 100644
+--- a/golden_tests/conftest_helpers.py
++++ b/golden_tests/conftest_helpers.py
+@@ -11,14 +11,20 @@ lists, so adding a piece/card to the list files automatically adds coverage.
+ Schema adaptation:
+   pieces_list.yaml: {id, name, cells, matrix(<=5x5 ints)} -> {id, name, level, cells, shape(5x5 ints)}
+   cards_list.yaml:  {id, name, rewards{points, piece}, matrix(5x5 ints)}
+-                    -> {id, name, mask(5x5 bool), reward{points, piece}}
++                    -> {id, name, mask(5x5 bool), reward{points, piece(Piece object)}}
+ Pieces are keyed by name (unique); cards are keyed by id (names are non-unique / sometimes blank).
+ """
+ import os
++import sys
+ 
+ import numpy as np
+ import yaml
+ 
++# Ensure the project root is importable so we can use the production Piece class.
++sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
++
++from ProjectL.classes import Piece
++
+ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+ 
+@@ -51,13 +57,32 @@ def load_pieces():
+     ]
+ 
+ 
++def pieces_by_id():
++    """Return {id: piece_config} for all pieces (e.g. {"P1": {...}, "P2": {...}})."""
++    return {piece["id"]: piece for piece in load_pieces()}
++
++
+ def load_cards():
+-    """Return card definition dicts (production Card schema) from cards_list.yaml."""
++    """Return card definition dicts (production Card schema) from cards_list.yaml.
++
++    The reward piece ID (e.g. "P1") is resolved to a real Piece object using the
++    piece definitions in pieces_list.yaml, so that card.reward.piece is always a
++    proper Piece instance rather than a raw string.
++    """
++    # Build ID -> piece config lookup so we can instantiate reward Pieces.
++    id_to_piece_conf = pieces_by_id()
++
+     raw = load_yaml(CARDS_LIST_YAML)["cards"]
+     cards = []
+     for c in raw:
+         mask = [[bool(value) for value in row] for row in c["matrix"]]
+-        reward = {"points": c["rewards"]["points"], "piece": c["rewards"]["piece"]}
++
++        piece_id = c["rewards"]["piece"]
++        # Resolve the piece ID to a real Piece object.
++        piece_conf = id_to_piece_conf.get(piece_id)
++        piece = Piece(piece_conf) if piece_conf else None
++
++        reward = {"points": c["rewards"]["points"], "piece": piece}
+         cards.append({"id": c["id"], "name": c.get("name") or c["id"], "mask": mask, "reward": reward})
+     return cards
+ 
+diff --git a/tests/test_configs.yaml b/tests/test_configs.yaml
+index 1154577..f004d1b 100644
+--- a/tests/test_configs.yaml
++++ b/tests/test_configs.yaml
+@@ -1,23 +1,12 @@
+-# Sample YAML file
++# Test game configuration
+ game_parameters:
+   max_turns: 10
+ 
+-# we list here the definitions of all the pieces available in game, including their level etc.
+-pieces:
+-  - name: square_1
+-    level: 1
+-    quantity: 3
+-    shape: [[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: line_2
+-    level: 2
+-    quantity: 3
+-    shape: [ [ 1, 0, 0, 0, 0 ], [ 1, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ] ]
++# Load pieces and cards from their dedicated configuration files.
++# Paths are resolved relative to the working directory (project root when running pytest).
++pieces_file: pieces_list.yaml
++cards_file: cards_list.yaml
+ 
+-cards:
+-  - reward:
+-      points: 1
+-      piece: null
+-    mask: [[false,false,true,true,false,], [false,false,true,true,false], [false,false,true,true,false], [false,false,false,false,false], [false,false,false,false,false], ]
+ players:
+   - name: Franciiiis
+     age: 39
+diff --git a/tests/test_game_integration.py b/tests/test_game_integration.py
+index 3912fec..0ee153a 100644
+--- a/tests/test_game_integration.py
++++ b/tests/test_game_integration.py
+@@ -7,53 +7,57 @@ from ProjectL.game_objects import GameManager, Player, RandomStrat, BasicStrat,
+ class TestGameIntegration(unittest.TestCase):
+     def setUp(self):
+         """Setup test game with specific config"""
+-        # Create a test config that's smaller but covers all mechanics
+-
+         with open("tests/test_configs.yaml", 'r') as file:
+             self.test_config = yaml.safe_load(file)
+ 
+     def test_full_game_flow(self):
+         """Test a complete game flow from start to finish"""
+-        # Initialize game
++        # Initialize game - base_dir defaults to cwd (project root when running pytest)
+         game_manager = GameManager(self.test_config)
+ 
+         # Validate initial game state
+         self.assertEqual(game_manager.game_state.current_turn_number, 1)
+         self.assertEqual(game_manager.game_state.max_turns, 10)
+-        
++
+         # Validate players were created correctly
+         self.assertEqual(game_manager.player_1.name, self.test_config["players"][0]["name"])
+         self.assertEqual(game_manager.player_2.name, self.test_config["players"][1]["name"])
+-        
++
+         # Set strategies for predictable testing
+         game_manager.player_1.set_strategy(BasicStrat(player=None))
+         game_manager.player_2.set_strategy(TakePieceStrat(player=None))
+-        
+-        # Validate initial piece setup
+-        # for every piece type in the configs, we have the right quantities
+-        for piece_conf in self.test_config["pieces"]:
+-            self.assertEqual(len(game_manager.piece_bank[piece_conf["name"]]), piece_conf["quantity"])
++
++        # Validate piece bank is populated correctly from pieces_list.yaml
++        self.assertGreater(len(game_manager.piece_bank), 0,
++                           "Piece bank should be non-empty after loading from pieces_list.yaml")
++        for piece_name, pieces in game_manager.piece_bank.items():
++            self.assertGreater(len(pieces), 0,
++                               f"Piece type '{piece_name}' should have instances in the bank")
++
++        # Validate cards were loaded from cards_list.yaml
++        self.assertGreater(len(game_manager.cards), 0,
++                           "Cards should be loaded from cards_list.yaml")
+ 
+         # Run the game
+         game_manager.run()
+-        
++
+         # Validate game completion
+         self.assertGreater(game_manager.game_state.current_turn_number, 1)
+         self.assertFalse(game_manager.game_state.is_game_running())
+-        
++
+         # Validate player states after game
+         self.assertIsNotNone(game_manager.player_1.pieces)
+         self.assertIsNotNone(game_manager.player_2.pieces)
+-        
++
+         # Check if players accumulated cards/pieces during the game
+-        total_cards = (len(game_manager.player_1.cards) + len(game_manager.player_1.full_cards) + 
++        total_cards = (len(game_manager.player_1.cards) + len(game_manager.player_1.full_cards) +
+                       len(game_manager.player_2.cards) + len(game_manager.player_2.full_cards))
+         self.assertGreater(total_cards, 0, "No cards were collected during the game")
+-        
++
+         # Validate that game ended at or before max turns
+-        self.assertLessEqual(game_manager.game_state.current_turn_number, 
++        self.assertLessEqual(game_manager.game_state.current_turn_number,
+                            game_manager.game_state.max_turns + 1)  # +1 because turn is incremented after max
+-        #
++
+ 
+ if __name__ == '__main__':
+     unittest.main()

@@ -1,0 +1,233 @@
+diff --git a/ProjectL/asset_loader.py b/ProjectL/asset_loader.py
+new file mode 100644
+index 0000000..3c87f83
+--- /dev/null
++++ b/ProjectL/asset_loader.py
+@@ -0,0 +1,92 @@
++"""Production loaders for the canonical game data.
++
++The canonical game data lives in pieces_list.yaml and cards_list.yaml (authored in the
++project's own schema). These helpers read those files and adapt each entry into the config
++shape the production Piece/Card classes expect, so the runtime (and the test suite) drive the
++real classes from the real data.
++
++Schema adaptation:
++  pieces_list.yaml: {id, name, cells, matrix(<=5x5 ints)} -> {id, name, level, cells, shape(5x5 ints)}
++  cards_list.yaml:  {id, name, rewards{points, piece}, matrix(5x5 ints)}
++                    -> {id, name, mask(5x5 bool), reward{points, piece}}
++Pieces are keyed by name (unique); cards reference a reward piece by id (P1..P10). The
++reference is resolved into a real Piece by resolve_reward_piece (used by Reward), so a card
++config can carry either the raw id or an already-resolved Piece.
++"""
++import os
++
++import numpy as np
++import yaml
++
++from ProjectL.pieces import Piece
++
++PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
++
++PIECES_LIST_YAML = os.path.join(PROJECT_ROOT, "pieces_list.yaml")
++CARDS_LIST_YAML = os.path.join(PROJECT_ROOT, "cards_list.yaml")
++
++# Lazily-built caches so piece configs are parsed once and Piece prototypes (which build their
++# rotation/translation cube) are created once per id rather than per card.
++_PIECE_CONFIG_BY_ID = None
++_PIECE_PROTOTYPE_BY_ID = {}
++
++
++def load_yaml(path):
++    """Load and return the parsed contents of a YAML file."""
++    with open(path, "r") as file:
++        return yaml.safe_load(file)
++
++
++def _pad_to_5x5(matrix):
++    """Place an arbitrary (<=5x5) int matrix into the top-left of a 5x5 grid."""
++    grid = np.zeros((5, 5), dtype=int)
++    src = np.array(matrix, dtype=int)
++    grid[: src.shape[0], : src.shape[1]] = src
++    return grid.tolist()
++
++
++def load_pieces(path=PIECES_LIST_YAML):
++    """Return piece definition dicts (production Piece schema) from pieces_list.yaml."""
++    raw = load_yaml(path)["pieces"]
++    return [
++        {"id": p["id"], "name": p["name"], "level": p["cells"], "cells": p["cells"], "shape": _pad_to_5x5(p["matrix"])}
++        for p in raw
++    ]
++
++
++def load_cards(path=CARDS_LIST_YAML):
++    """Return card definition dicts (production Card schema) from cards_list.yaml.
++
++    The reward keeps the raw piece reference (e.g. "P1"); Reward resolves it into a real Piece
++    via resolve_reward_piece when the card is constructed.
++    """
++    raw = load_yaml(path)["cards"]
++    cards = []
++    for c in raw:
++        mask = [[bool(value) for value in row] for row in c["matrix"]]
++        reward = {"points": c["rewards"]["points"], "piece": c["rewards"]["piece"]}
++        cards.append({"id": c["id"], "name": c.get("name") or c["id"], "mask": mask, "reward": reward})
++    return cards
++
++
++def piece_config_by_id(path=PIECES_LIST_YAML):
++    """Return (and cache) {id: piece_config} for all pieces in pieces_list.yaml."""
++    global _PIECE_CONFIG_BY_ID
++    if _PIECE_CONFIG_BY_ID is None:
++        _PIECE_CONFIG_BY_ID = {config["id"]: config for config in load_pieces(path)}
++    return _PIECE_CONFIG_BY_ID
++
++
++def resolve_reward_piece(reference):
++    """Resolve a card's reward piece reference into a real Piece (or None).
++
++    reference may be None (-> None, so Reward falls back to its default), an already-resolved
++    Piece (-> returned unchanged), or a piece id string such as "P1" (-> the matching Piece).
++    An unknown id resolves to None. Prototypes are cached and reused across cards.
++    """
++    if reference is None or isinstance(reference, Piece):
++        return reference
++    if reference not in _PIECE_PROTOTYPE_BY_ID:
++        config = piece_config_by_id().get(reference)
++        _PIECE_PROTOTYPE_BY_ID[reference] = Piece(configs=config) if config else None
++    return _PIECE_PROTOTYPE_BY_ID[reference]
+diff --git a/ProjectL/card.py b/ProjectL/card.py
+index 8630ec8..b024b8e 100644
+--- a/ProjectL/card.py
++++ b/ProjectL/card.py
+@@ -1,6 +1,7 @@
+ import numpy as np
+ 
+ from ProjectL.pieces import PieceSquare
++from ProjectL.asset_loader import resolve_reward_piece
+ 
+ 
+ class Reward:
+@@ -9,7 +10,10 @@ class Reward:
+     """
+     def __init__(self, points = 0, piece = None):
+         self.points = points
+-        self.piece = piece if piece else PieceSquare()
++        # piece may be a raw reference (e.g. "P1") from the card list, an already-resolved
++        # Piece, or None; resolve it to a real Piece and fall back to the default square.
++        resolved = resolve_reward_piece(piece)
++        self.piece = resolved if resolved else PieceSquare()
+ 
+     def __repr__(self):
+         return f"Points: {self.points} with piece: {self.piece.name}"
+diff --git a/ProjectL/game_objects.py b/ProjectL/game_objects.py
+index 3c8dcaf..cba5890 100644
+--- a/ProjectL/game_objects.py
++++ b/ProjectL/game_objects.py
+@@ -48,14 +48,15 @@ class GameManager:
+         self.actions = [TakePiece, PlacePiece, TakeCard]
+         self.cards = []
+ 
++        # build the piece bank / cards before creating players so they can draw real starting pieces
++        self.game_init()
++
+         # players        TODO: ugly, refactor & makes a more robust initialization
+         self.player_1 = Player(name=configs_dict["players"][0]["name"], actions=self.actions, logger=self.logger, game_manager=self)
+         self.player_1.set_strategy(TakePieceStrat(player=self.player_1, logger=self.logger))
+         self.player_2 = Player(name=configs_dict["players"][1]["name"], actions=self.actions, logger=self.logger, game_manager=self)
+         self.player_2.set_strategy(TakePieceStrat(player=self.player_2, logger=self.logger))
+ 
+-        self.game_init()
+-
+     def game_init(self):
+         """ setup for the beginning of the game
+         """
+@@ -190,8 +191,8 @@ class Player:
+     def get_initial_pieces(self):
+         self.logger.debug(f"Getting initial pieces for {self.name}", extra={"normal": False, "verbose": True})
+         if self.game_manager:
+-            piece = self.game_manager.get_piece("square_1")
+-            return [piece] if piece else []
++            piece = self.game_manager.get_piece("monomino")
++            return [piece] if piece else [PieceSquare()]
+         return [PieceSquare()]  # Fallback
+ 
+     def set_strategy(self, strategy):
+diff --git a/ProjectL/main.py b/ProjectL/main.py
+index d1ae16f..2115ac8 100644
+--- a/ProjectL/main.py
++++ b/ProjectL/main.py
+@@ -2,8 +2,9 @@
+ import yaml
+ import os
+ import logging
+-from game_objects import GameManager
+-from logging_utils import setup_logging
++from ProjectL.game_objects import GameManager
++from ProjectL.logging_utils import setup_logging
++from ProjectL.asset_loader import load_pieces, load_cards
+ 
+ # TODO: configure as a default general configs the maximal dimensions of the card
+ 
+@@ -15,6 +16,11 @@ file_path = os.path.join(parent_dir, 'configs.yaml')
+ def main():
+     configs_dict = read_yaml(file_path)
+ 
++    # Pieces and cards are sourced from the canonical list files; configs.yaml only carries
++    # game_parameters / logging / players. Reward references (P1..) resolve to real pieces.
++    configs_dict["pieces"] = load_pieces()
++    configs_dict["cards"] = load_cards()
++
+     # Set up logging
+     logger = setup_logging(configs_dict)
+ 
+diff --git a/configs.yaml b/configs.yaml
+index 160ee70..64d81f9 100644
+--- a/configs.yaml
++++ b/configs.yaml
+@@ -7,43 +7,8 @@ logging:
+   max_file_size_mb: 5
+   backup_count: 3
+   logger_name: 'bob'
+-# we list here the definitions of all the pieces available in game, including their level etc.
+-pieces:
+-  - name: square_1
+-    level: 1
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: line_2
+-    level: 2
+-    quantity: 10
+-    shape: [ [ 1, 0, 0, 0, 0 ], [ 1, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ], [ 0, 0, 0, 0, 0 ] ]
+-  - name: corner_3
+-    level: 3
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: line_3
+-    level: 3
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: big_square_4
+-    level: 4
+-    quantity: 10
+-    shape: [[1, 1, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: line_4
+-    level: 4
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-  - name: l_shape_4
+-    level: 4
+-    quantity: 10
+-    shape: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+-
+-  
+-cards:
+-  - reward:
+-      points: 1
+-      piece: null
+-    mask: [[false,false,true,true,false,], [false,false,true,true,false], [false,false,true,true,false], [false,false,false,false,false], [false,false,false,false,false], ]
++# Pieces and cards are sourced from pieces_list.yaml / cards_list.yaml at runtime
++# (see ProjectL/asset_loader.py + main.py), not defined here.
+ players:
+   - name: Franciiiis
+     age: 39

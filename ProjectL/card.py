@@ -1,6 +1,7 @@
 import numpy as np
 
 from ProjectL.pieces import PieceSquare
+from ProjectL.asset_loader import resolve_reward_piece
 
 
 class Reward:
@@ -9,7 +10,10 @@ class Reward:
     """
     def __init__(self, points = 0, piece = None):
         self.points = points
-        self.piece = piece if piece else PieceSquare()
+        # piece may be a raw reference (e.g. "P1") from the card list, an already-resolved
+        # Piece, or None; resolve it to a real Piece and fall back to the default square.
+        resolved = resolve_reward_piece(piece)
+        self.piece = resolved if resolved else PieceSquare()
 
     def __repr__(self):
         return f"Points: {self.points} with piece: {self.piece.name}"

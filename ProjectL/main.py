@@ -2,8 +2,9 @@
 import yaml
 import os
 import logging
-from game_objects import GameManager
-from logging_utils import setup_logging
+from ProjectL.game_objects import GameManager
+from ProjectL.logging_utils import setup_logging
+from ProjectL.asset_loader import load_pieces, load_cards
 
 # TODO: configure as a default general configs the maximal dimensions of the card
 
@@ -14,6 +15,11 @@ file_path = os.path.join(parent_dir, 'configs.yaml')
 
 def main():
     configs_dict = read_yaml(file_path)
+
+    # Pieces and cards are sourced from the canonical list files; configs.yaml only carries
+    # game_parameters / logging / players. Reward references (P1..) resolve to real pieces.
+    configs_dict["pieces"] = load_pieces()
+    configs_dict["cards"] = load_cards()
 
     # Set up logging
     logger = setup_logging(configs_dict)

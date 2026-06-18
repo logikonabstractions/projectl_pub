@@ -48,13 +48,14 @@ class GameManager:
         self.actions = [TakePiece, PlacePiece, TakeCard]
         self.cards = []
 
+        # build the piece bank / cards before creating players so they can draw real starting pieces
+        self.game_init()
+
         # players        TODO: ugly, refactor & makes a more robust initialization
         self.player_1 = Player(name=configs_dict["players"][0]["name"], actions=self.actions, logger=self.logger, game_manager=self)
         self.player_1.set_strategy(TakePieceStrat(player=self.player_1, logger=self.logger))
         self.player_2 = Player(name=configs_dict["players"][1]["name"], actions=self.actions, logger=self.logger, game_manager=self)
         self.player_2.set_strategy(TakePieceStrat(player=self.player_2, logger=self.logger))
-
-        self.game_init()
 
     def game_init(self):
         """ setup for the beginning of the game
@@ -190,8 +191,8 @@ class Player:
     def get_initial_pieces(self):
         self.logger.debug(f"Getting initial pieces for {self.name}", extra={"normal": False, "verbose": True})
         if self.game_manager:
-            piece = self.game_manager.get_piece("square_1")
-            return [piece] if piece else []
+            piece = self.game_manager.get_piece("monomino")
+            return [piece] if piece else [PieceSquare()]
         return [PieceSquare()]  # Fallback
 
     def set_strategy(self, strategy):
